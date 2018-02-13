@@ -87,7 +87,10 @@ def inject_gallery(text, gallery_entries):
     for i, line in enumerate(lines):
         if line.strip() == '==General Information==':
             break
-    lines[i:i] = ['==Score previews==', '<gallery widths=500 heights=250>'] + gallery_entries + ['</gallery>']
+    lines[i:i] = ['==Score previews==',
+                  '<div style="clear: both"></div>'
+                  '<gallery widths=500 heights=250>'
+                  ] + gallery_entries + ['</gallery>']
     return '\n'.join(lines)
 
 
@@ -95,6 +98,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--saved-page')
     parser.add_argument('--page')
+    parser.add_argument('--assume-uploaded', action='store_true')
     args = parser.parse_args()
 
     username, pwd = open(os.path.expanduser('~/.config/cpdl')).read().split()
@@ -115,8 +119,9 @@ def main():
     for e in editions:
         for p in e.pdfs:
             filehash, imageinfo = fetch_pdf(cpdl, p, 'wd')
-            convert('wd', filehash)
-            upload(cpdl, 'wd', filehash, p)
+            if not args.assume_uploaded:
+                convert('wd', filehash)
+                upload(cpdl, 'wd', filehash, p)
             gallery_entries.append('File:{preview}|{info}|link={url}'.format(
                 preview='Preview' + filehash + '.png', info=e.info(), url=imageinfo['url']))
 
