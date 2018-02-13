@@ -4,6 +4,7 @@ import os, sys
 import mwclient
 import argparse
 import mwparserfromhell
+import subprocess
 
 
 def link_is_pdf(tag):
@@ -47,14 +48,28 @@ def process_text(text):
     return editions
 
 
-def fetch_pdf(cpdl, link):
+def fetch_pdf(cpdl, link, workdir):
     if link.startswith('Media:'):
         filename = link.partition(':')[2]
         pdf = cpdl.images[filename]
-        print(pdf.imageinfo)
+        sha1 = pdf.imageinfo['sha1']
+        localname = workdir + '/' + sha1
+        with open(localname + '.pdf', 'wb') as localfile:
+            pdf.download(localfile)
+        return sha1
     else:
         raise 1
 
+
+def convert(workdir, filehash):
+    def fn(extn):
+        return workdir + '/' + filehash + '.' + extn
+
+    subprocess.check_call(
+            'pdftoppm -singlefile -scale-to-x 1000 -scale-to-y -1 -png'.split() +
+            [fn('pdf'), fn('uncut')])
+    subprocess.check_call(
+            ['convert', fn('uncut.png'), '-crop', '1000x500+0+0', '+repage', fn('png')])
 
 
 def main():
@@ -79,7 +94,8 @@ def main():
 
     for e in editions:
         for p in e.pdfs:
-            fetch_pdf(cpdl, p)
+            filehash = fetch_pdf(cpdl, p, 'wd')
+            convert('wd', filehash)
 
     #page.save(text, 'Test editing.')
 
