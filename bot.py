@@ -47,12 +47,21 @@ def process_text(text):
     return editions
 
 
+def fetch_pdf(cpdl, link):
+    if link.startswith('Media:'):
+        filename = link.partition(':')[2]
+        pdf = cpdl.images[filename]
+        print(pdf.imageinfo)
+    else:
+        raise 1
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--saved-page')
-    parser.add_argument('page')
+    parser.add_argument('--page')
     args = parser.parse_args()
-
 
     username, pwd = open(os.path.expanduser('~/.config/cpdl')).read().split()
 
@@ -67,6 +76,10 @@ def main():
         text = page.text()
 
     editions = process_text(text)
+
+    for e in editions:
+        for p in e.pdfs:
+            fetch_pdf(cpdl, p)
 
     #page.save(text, 'Test editing.')
 
