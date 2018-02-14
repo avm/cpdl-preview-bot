@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys
+import os
 import mwclient
 import argparse
 import mwparserfromhell
@@ -14,6 +14,8 @@ def link_is_pdf(tag):
 class Edition:
     def __init__(self):
         self.score_info = None
+        self.editor_params = None
+        self.cpdlno_params = None
         self.pdfs = []
 
     def add_pdf(self, pdf_link):
@@ -21,11 +23,25 @@ class Edition:
 
     def info(self):
         if self.score_info:
-            return '{}, {} pages, {} kB'.format(*self.score_info)
+            return '{{PreviewScoreInfo|%s}}' % self.score_info
+        return ''
+
+    def editor(self):
+        if self.editor_params:
+            return '{{PreviewEditor|%s}}' % self.editor_params
+        return ''
+
+    def cpdlno(self):
+        if self.cpdlno_params:
+            return 'CPDL #' + self.cpdlno_params
         return ''
 
     def __repr__(self):
         return 'Edition({}, {})'.format(self.info(), self.pdfs)
+
+
+def strparams(tag):
+    return '|'.join(str(p) for p in tag.params)
 
 
 def process_text(text):
@@ -42,8 +58,11 @@ def process_text(text):
         elif isinstance(tag, mwparserfromhell.nodes.template.Template):
             if tag.name == 'CPDLno':
                 editions.append(Edition())
+                editions[-1].cpdlno_params = strparams(tag)
+            elif tag.name == 'Editor':
+                editions[-1].editor_params = strparams(tag)
             elif tag.name == 'ScoreInfo':
-                editions[-1].score_info = tag.params
+                editions[-1].score_info = strparams(tag)
 
     return editions
 
@@ -99,6 +118,7 @@ def main():
     parser.add_argument('--saved-page')
     parser.add_argument('--page')
     parser.add_argument('--assume-uploaded', action='store_true')
+    parser.add_argument('--just-print-gallery', action='store_true')
     args = parser.parse_args()
 
     username, pwd = open(os.path.expanduser('~/.config/cpdl')).read().split()
@@ -123,10 +143,15 @@ def main():
                 convert('wd', filehash)
                 upload(cpdl, 'wd', filehash, p)
             gallery_entries.append('File:{preview}|{info}|link={url}'.format(
-                preview='Preview' + filehash + '.png', info=e.info(), url=imageinfo['url']))
+                preview='Preview' + filehash + '.png',
+                info='{}; {}; {}'.format(e.info(), e.cpdlno(), e.editor()),
+                url=("{{filepath:%s}}" % p.rpartition(':')[2])))
 
-    text = inject_gallery(text, gallery_entries)
-    page.save(text, 'Generate PDF previews.')
+    if args.just_print_gallery:
+        print('Gallery text:\n' + '\n'.join(gallery_entries))
+    else:
+        text = inject_gallery(text, gallery_entries)
+        page.save(text, 'Generate PDF previews.')
 
 
 if __name__ == '__main__':
